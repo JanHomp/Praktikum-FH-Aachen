@@ -1,3 +1,13 @@
+"""Sehr einfache Auswertung einer Trajektorie (Dummy-evo).
+
+Kurzfassung fuer Nicht-Programmierer:
+- Liest eine Trajektorie (Zeit, x, y).
+- Berechnet zwei Kennzahlen:
+  APE = mittlere Entfernung der Punkte zum Ursprung.
+  RPE = mittlere Schrittlaenge zwischen aufeinanderfolgenden Punkten.
+- Schreibt die Werte in metrics.txt.
+"""
+
 import math
 import os
 import sys
@@ -31,9 +41,11 @@ if not points:
     print("FEHLER: Keine gueltigen Punkte in der Trajektorie gefunden")
     sys.exit(2)
 
+# APE: mittlere Entfernung zum Ursprung (0,0).
 ape_val = sum(math.hypot(x, y) for x, y in points) / len(points)
 
 if len(points) >= 2:
+    # RPE: mittlere Schrittlaenge zwischen den Punkten.
     step_sum = 0.0
     for (x1, y1), (x2, y2) in zip(points, points[1:]):
         step_sum += math.hypot(x2 - x1, y2 - y1)

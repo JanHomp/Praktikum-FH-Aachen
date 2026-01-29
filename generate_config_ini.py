@@ -1,6 +1,15 @@
+"""Erzeugt eine konkrete config.ini aus einer Vorlage und Parametern.
+
+Kurzfassung fuer Nicht-Programmierer:
+- Es gibt eine Vorlage (slam_template.ini) mit Platzhaltern wie {{MAX_FEATURES}}.
+- Diese werden durch echte Werte ersetzt.
+- Die fertige config.ini landet im jeweiligen run-Ordner.
+"""
+
 import os
 import sys
 
+# Standardwerte, falls keine Ueberschreibungen kommen.
 params = {
     "MAX_FEATURES": 800,
     "LOOP_CLOSURE": True,
@@ -16,6 +25,7 @@ OUTPUT_CONFIG = os.path.join(OUTPUT_DIR, "config.ini")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def coerce_value(raw):
+    """Versucht Strings in echte Datentypen umzuwandeln (bool/int/float)."""
     lowered = raw.lower()
     if lowered == "true":
         return True
@@ -32,6 +42,7 @@ def coerce_value(raw):
 
 
 def apply_overrides(param_map, args):
+    """Ueberschreibt Parameter aus der Kommandozeile (KEY=VALUE)."""
     for arg in args:
         if "=" not in arg:
             continue
@@ -49,6 +60,7 @@ if not os.path.isfile(TEMPLATE_PATH):
 with open(TEMPLATE_PATH, "r") as f:
     template_text = f.read()
 
+# Platzhalter {{KEY}} durch die aktuellen Werte ersetzen.
 for key, value in params.items():
     template_text = template_text.replace(f"{{{{{key}}}}}", str(value))
 
