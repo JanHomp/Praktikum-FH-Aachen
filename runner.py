@@ -15,9 +15,9 @@ RUN_ID_WIDTH = 2
 
 
 GRID = {
-    "MAX_FEATURES": [600, 800, 1000, 1200, 1400, 1600],
-    "LOOP_CLOSURE": [True, False],
-    "MAP_RESOLUTION": [0.05, 0.1, 0.00001, 0.005, 1, 0.0000000001]
+    "MAX_FEATURES": [600, 800, 1000],
+    "LOOP_CLOSURE": [True],
+    "MAP_RESOLUTION": [0.05, 0.1, 0.00001]
 }
 
 SEARCH_MODE = "grid"  
