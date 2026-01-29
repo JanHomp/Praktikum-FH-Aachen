@@ -4,11 +4,18 @@ Kurzfassung fuer Nicht-Programmierer:
 - Es gibt eine Vorlage (slam_template.ini) mit Platzhaltern wie {{MAX_FEATURES}}.
 - Diese werden durch echte Werte ersetzt.
 - Die fertige config.ini landet im jeweiligen run-Ordner.
+
+Aufruf:
+  python3 generate_config_ini.py <run_id> KEY=VALUE KEY=VALUE ...
+
+Beispiel:
+  python3 generate_config_ini.py run_01 MAX_FEATURES=800 LOOP_CLOSURE=True
 """
 
 import os
 import sys
 
+# Standardwerte, falls keine Ueberschreibungen kommen.
 # Standardwerte, falls keine Ueberschreibungen kommen.
 params = {
     "MAX_FEATURES": 800,
@@ -51,6 +58,7 @@ def apply_overrides(param_map, args):
             param_map[key] = coerce_value(raw)
 
 
+# Kommandozeilen-Parameter in die Defaults uebernehmen.
 apply_overrides(params, sys.argv[2:])
 
 if not os.path.isfile(TEMPLATE_PATH):

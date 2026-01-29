@@ -4,8 +4,11 @@ Kurzfassung fuer Nicht-Programmierer:
 - Liest die Konfiguration (hier nur Pfad-Check).
 - Wartet kurz, um Rechenzeit zu simulieren.
 - Schreibt Beispiel-Trajektorien im TUM-Format:
-  - trajectory_gt.tum  (Ground Truth)
-  - trajectory_est.tum (Schaetzung, leicht verrauscht)
+  - trajectory_gt.tum  (Ground Truth, gerade Linie)
+  - trajectory_est.tum (Schaetzung, gleiche Linie + Rauschen)
+
+TUM-Format pro Zeile:
+  <timestamp> <tx> <ty> <tz> <qx> <qy> <qz> <qw>
 """
 
 import os
@@ -13,6 +16,7 @@ import random
 import sys
 import time
 
+# ---- Eingabepruefung -------------------------------------------------------
 if len(sys.argv) < 2:
     print("FEHLER: Kein Config-Pfad übergeben")
     sys.exit(2)
@@ -29,20 +33,13 @@ print(f"Dummy-SLAM gestartet mit {config_path}")
 # Simulierte Rechenzeit.
 time.sleep(2)
 
-trajectory_txt = os.path.join(run_dir, "trajectory.txt")
 trajectory_gt = os.path.join(run_dir, "trajectory_gt.tum")
 trajectory_est = os.path.join(run_dir, "trajectory_est.tum")
-
-# Altes Textformat (einfach) weiterhin schreiben, damit nichts bricht.
-with open(trajectory_txt, "w") as f:
-    for t in range(10):
-        x = random.random()
-        y = random.random()
-        f.write(f"{t} {x} {y}\n")
 
 # TUM-Format: timestamp tx ty tz qx qy qz qw
 with open(trajectory_gt, "w") as gt, open(trajectory_est, "w") as est:
     for t in range(10):
+        # Ground-Truth: Gerade Linie entlang der x-Achse.
         ts = float(t)
         x = t * 0.5
         y = 0.0
@@ -50,6 +47,7 @@ with open(trajectory_gt, "w") as gt, open(trajectory_est, "w") as est:
         qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0
         gt.write(f"{ts} {x} {y} {z} {qx} {qy} {qz} {qw}\n")
 
+        # Schaetzung: Gleiche Linie + leichtes Rauschen.
         noise = random.gauss(0.0, 0.02)
         est.write(f"{ts} {x + noise} {y + noise} {z} {qx} {qy} {qz} {qw}\n")
 

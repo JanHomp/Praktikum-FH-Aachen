@@ -1,16 +1,26 @@
 """Steuert eine Reihe von SLAM-Experimenten und sammelt Ergebnisse.
 
 Kurzfassung fuer Nicht-Programmierer:
-- Es werden mehrere Parameter-Kombinationen ausprobiert (Grid/Random/Bandit).
+- Alle Parameter-Kombinationen aus GRID werden ausprobiert (Grid Search).
 - Fuer jeden Versuch wird eine Konfiguration erzeugt, ein SLAM-Lauf gestartet
   und danach mit evo ausgewertet.
 - Ergebnisse landen pro Lauf in einem Ordner unter runs/ und in einer CSV-Uebersicht.
+
+Wichtige Dateien, die dieser Runner schreibt:
+- runs/<run_id>/run.log           (Konsolen-Ausgaben pro Schritt)
+- runs/<run_id>/metrics.json      (APE/RPE von evo)
+- runs/grid_summary.csv           (Uebersicht ueber alle Runs)
+- runs/best_result.txt            (bester Lauf)
+
+Run-ID Format:
+- run_XX__mf600_lc1_mr0p05
+- run_XX = fortlaufende Nummer
+- mf/lc/mr = kurze Codes fuer Parameter (siehe param_code)
 """
 
 import itertools
 import json
 import os
-import random
 import subprocess
 import sys
 
@@ -28,15 +38,6 @@ LOG_LIMIT_GB = 10
 LOG_LIMIT_BYTES = LOG_LIMIT_GB * 1024 * 1024 * 1024
 RUN_ID_WIDTH = 2
 
-# Optional: externe evo-CLI per Umgebungsvariablen steuern.
-# Beispiel:
-#   export EVO_MODE=external
-#   export EVO_CMD="evo_ape tum {gt} {est} --save_results {metrics}"
-#   export EVO_GT="/pfad/zu/ground_truth.txt"
-EVO_MODE = os.environ.get("EVO_MODE")
-EVO_CMD = os.environ.get("EVO_CMD")
-EVO_GT = os.environ.get("EVO_GT")
-
 
 # Parameterraum fuer die Suche.
 # Hier definieren wir alle Werte, die ausprobiert werden.
@@ -46,17 +47,11 @@ GRID = {
     "MAP_RESOLUTION": [0.05, 0.1, 0.00001]
 }
 
-# "grid" prueft alle Kombinationen; "random" zieht eine Stichprobe;
-# "bandit" lernt waehrend des Laufens, welche Parameter gut sind.
-SEARCH_MODE = "grid"
-RANDOM_SAMPLES = 20
-RANDOM_SEED = 42
-
-# Bandit-Search (intelligente Steuerung mit Live-Ergebnissen).
-BANDIT_MAX_RUNS = 20
-BANDIT_EPSILON = 0.2
-BANDIT_SCORE_EPS = 1e-6
-BANDIT_SAMPLE_TRIES = 30
+# Statuswerte (werden in status.txt geschrieben):
+# - SUCCESS        : Run und Auswertung ok
+# - FAILED         : Ein Schritt ist fehlgeschlagen
+# - FAILED_METRICS : Auswertung lief, aber keine Metriken gefunden
+# - TIMEOUT        : Ein Schritt hat zu lange gedauert
 
 
 def run_step(args, log_path, timeout_seconds):
@@ -84,6 +79,16 @@ def run_step(args, log_path, timeout_seconds):
         except subprocess.CalledProcessError as exc:
             log.write(f"# FAILED exit={exc.returncode}\n")
             return "FAILED"
+
+
+def init_run_log(log_path, run_id, params):
+    """Legt ein frisches Log pro Run an (alte Inhalte werden ueberschrieben).
+
+    Der Header hilft, alte Logdateien eindeutig einem Run zuzuordnen.
+    """
+    with open(log_path, "w") as log:
+        log.write(f"# RUN_ID: {run_id}\n")
+        log.write("# PARAMS: " + ", ".join(f"{k}={format_value(v)}" for k, v in params.items()) + "\n")
 
 
 def format_value(value):
@@ -143,7 +148,11 @@ def write_status(run_dir, status):
 
 
 def read_metrics(run_dir):
-    """Liest APE/RPE aus metrics.json oder metrics.txt, falls vorhanden."""
+    """Liest APE/RPE aus metrics.json.
+
+    Erwartete Felder in metrics.json:
+    - ape_mean, rpe_mean (float)
+    """
     json_path = os.path.join(run_dir, "metrics.json")
     if os.path.isfile(json_path):
         try:
@@ -156,100 +165,15 @@ def read_metrics(run_dir):
             return ape, rpe
         except (OSError, ValueError, TypeError, json.JSONDecodeError):
             pass
-    metrics_path = os.path.join(run_dir, "metrics.txt")
-    if not os.path.isfile(metrics_path):
-        return None, None
-    ape = None
-    rpe = None
-    with open(metrics_path, "r") as f:
-        for line in f:
-            if line.startswith("APE:"):
-                try:
-                    ape = float(line.split(":", 1)[1].strip())
-                except ValueError:
-                    pass
-            elif line.startswith("RPE:"):
-                try:
-                    rpe = float(line.split(":", 1)[1].strip())
-                except ValueError:
-                    pass
-    return ape, rpe
-
-
-# ---- Bandit-Search Hilfsfunktionen ---------------------------------------
-def init_bandit_stats(names, grid):
-    stats = {}
-    for name in names:
-        stats[name] = {value: {"score_sum": 0.0, "count": 0} for value in grid[name]}
-    return stats
-
-
-def choose_bandit_value(values, stats_map, epsilon):
-    if random.random() < epsilon:
-        return random.choice(values)
-    weights = []
-    for value in values:
-        entry = stats_map[value]
-        if entry["count"] == 0:
-            weight = 1.0
-        else:
-            weight = max(entry["score_sum"] / entry["count"], 1e-9)
-        weights.append(weight)
-    if not weights or max(weights) <= 0:
-        return random.choice(values)
-    return random.choices(values, weights=weights, k=1)[0]
-
-
-def sample_bandit_combo(names, grid, stats, remaining, epsilon, max_tries):
-    for _ in range(max_tries):
-        combo = tuple(choose_bandit_value(grid[name], stats[name], epsilon) for name in names)
-        if combo in remaining:
-            return combo
-    return random.choice(tuple(remaining))
-
-
-def update_bandit(stats, params, score):
-    for name, value in params.items():
-        entry = stats[name][value]
-        entry["score_sum"] += score
-        entry["count"] += 1
+    return None, None
 
 
 # Reihenfolge der Parameter beibehalten (wichtig fuer CSV und Run-IDs).
 param_names = list(GRID.keys())
 value_sets = [GRID[name] for name in param_names]
 
-# Kombinationsliste aufbauen: Grid/Random sofort, Bandit spaeter.
-combos = None
-combo_iter = None
-bandit_stats = None
-remaining_combos = None
-max_runs = None
-
-if SEARCH_MODE == "grid":
-    combos = list(itertools.product(*value_sets))
-    combo_iter = iter(combos)
-elif SEARCH_MODE == "random":
-    if RANDOM_SAMPLES <= 0:
-        print("FEHLER: RANDOM_SAMPLES muss > 0 sein")
-        sys.exit(2)
-    if RANDOM_SEED is not None:
-        random.seed(RANDOM_SEED)
-    combos = [
-        tuple(random.choice(GRID[name]) for name in param_names)
-        for _ in range(RANDOM_SAMPLES)
-    ]
-    combo_iter = iter(combos)
-elif SEARCH_MODE == "bandit":
-    if RANDOM_SEED is not None:
-        random.seed(RANDOM_SEED)
-    combos = list(itertools.product(*value_sets))
-    bandit_stats = init_bandit_stats(param_names, GRID)
-    remaining_combos = set(combos)
-    max_runs = min(BANDIT_MAX_RUNS, len(combos))
-else:
-    print(f"FEHLER: Unbekannter SEARCH_MODE: {SEARCH_MODE}")
-    sys.exit(2)
+# Alle Kombinationen aller Parameter erzeugen (vollstaendiger Grid Search).
+combos = list(itertools.product(*value_sets))
 
 if not combos:
     print("FEHLER: Grid ist leer, keine Runs ausgefuehrt")
@@ -263,27 +187,7 @@ best = None
 rows = []
 
 # Hauptschleife: jeder Parameter-Satz = ein Lauf.
-run_index = 0
-while True:
-    if SEARCH_MODE == "bandit":
-        if not remaining_combos or run_index >= max_runs:
-            break
-        combo = sample_bandit_combo(
-            param_names,
-            GRID,
-            bandit_stats,
-            remaining_combos,
-            BANDIT_EPSILON,
-            BANDIT_SAMPLE_TRIES,
-        )
-        remaining_combos.remove(combo)
-    else:
-        try:
-            combo = next(combo_iter)
-        except StopIteration:
-            break
-
-    run_index += 1
+for run_index, combo in enumerate(combos, 1):
     params = dict(zip(param_names, combo))
     run_id = build_run_id(run_index, params, param_names)
     run_dir = os.path.join(RUNS_DIR, run_id)
@@ -309,6 +213,7 @@ while True:
 
     print(f"\n=== Starte {run_id} ===", flush=True)
     os.makedirs(run_dir, exist_ok=True)
+    init_run_log(log_path, run_id, params)
 
     # 1) Konfiguration bauen
     status = run_step([PYTHON, "generate_config_ini.py", run_id, *overrides], log_path, TIMEOUT_SECONDS)
@@ -324,25 +229,18 @@ while True:
         rows.append({"run_id": run_id, "params": params, "status": status, "ape": None, "rpe": None})
         continue
 
-    # 3) Auswertung mit evo (hier Dummy-Auswertung)
-    evo_args = [PYTHON, "evo_runner.py", trajectory_path]
-    if EVO_MODE:
-        evo_args += ["--mode", EVO_MODE]
-    if EVO_CMD:
-        evo_args += ["--cmd", EVO_CMD]
-    if EVO_GT:
-        evo_args += ["--ground-truth", EVO_GT]
-
-    status = run_step(evo_args, log_path, TIMEOUT_SECONDS)
+    # 3) Auswertung mit evo (echte evo-CLI)
+    status = run_step([PYTHON, "evo_runner.py", trajectory_path], log_path, TIMEOUT_SECONDS)
     if status != "OK":
         write_status(run_dir, status)
         rows.append({"run_id": run_id, "params": params, "status": status, "ape": None, "rpe": None})
         continue
 
+    # 4) Metriken lesen und in die Uebersicht schreiben.
     ape, rpe = read_metrics(run_dir)
     if ape is None and rpe is None:
-        write_status(run_dir, "SUCCESS_NO_METRICS")
-        rows.append({"run_id": run_id, "params": params, "status": "SUCCESS_NO_METRICS", "ape": ape, "rpe": rpe})
+        write_status(run_dir, "FAILED_METRICS")
+        rows.append({"run_id": run_id, "params": params, "status": "FAILED_METRICS", "ape": ape, "rpe": rpe})
         print(f"Warnung: Keine Metriken gefunden. Pruefe {log_path}", flush=True)
     else:
         write_status(run_dir, "SUCCESS")
@@ -358,13 +256,10 @@ while True:
                 "ape": ape,
                 "rpe": rpe
             }
-        if SEARCH_MODE == "bandit":
-            score = 1.0 / (ape + BANDIT_SCORE_EPS)
-            update_bandit(bandit_stats, params, score)
-
     print(f"=== {run_id} abgeschlossen ===", flush=True)
 
 # CSV-Zusammenfassung schreiben.
+# Spalten: run_id, Parameter, status, ape, rpe, best(1/leer).
 with open(summary_path, "w") as summary:
     summary.write("run_id," + ",".join(param_names) + ",status,ape,rpe,best\n")
     for row in rows:

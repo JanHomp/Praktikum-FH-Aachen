@@ -2,8 +2,9 @@
 
 Kurzfassung fuer Nicht-Programmierer:
 - Liest `runs/grid_summary.csv`.
-- Zeigt, welche Parameter gut/schlecht sind.
+- Filtert nur Runs mit Status SUCCESS.
 - Gibt Basisstatistiken fuer APE/RPE aus.
+- Zeigt die besten Runs nach APE.
 """
 
 import argparse
@@ -21,6 +22,7 @@ def parse_args():
 
 
 def to_float(value):
+    # Wandelt CSV-Strings sicher in Float um.
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -28,6 +30,7 @@ def to_float(value):
 
 
 def describe(values):
+    # Kurze Statistik (nur wenn Werte vorhanden sind).
     if not values:
         return None
     return {
