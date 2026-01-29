@@ -30,7 +30,7 @@ run_dir = os.path.dirname(config_path)
 
 print(f"Dummy-SLAM gestartet mit {config_path}")
 
-# Simulierte Rechenzeit.
+# Simulierte Rechenzeit
 time.sleep(2)
 
 trajectory_gt = os.path.join(run_dir, "trajectory_gt.tum")
@@ -39,7 +39,7 @@ trajectory_est = os.path.join(run_dir, "trajectory_est.tum")
 # TUM-Format: timestamp tx ty tz qx qy qz qw
 with open(trajectory_gt, "w") as gt, open(trajectory_est, "w") as est:
     for t in range(10):
-        # Ground-Truth: Gerade Linie entlang der x-Achse.
+        # Ground-Truth: Gerade Linie entlang der x-Achse
         ts = float(t)
         x = t * 0.5
         y = 0.0
@@ -47,7 +47,7 @@ with open(trajectory_gt, "w") as gt, open(trajectory_est, "w") as est:
         qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0
         gt.write(f"{ts} {x} {y} {z} {qx} {qy} {qz} {qw}\n")
 
-        # Schaetzung: Gleiche Linie + leichtes Rauschen.
+        # Schaetzung: Gleiche Linie + leichtes Rauschen
         noise = random.gauss(0.0, 0.02)
         est.write(f"{ts} {x + noise} {y + noise} {z} {qx} {qy} {qz} {qw}\n")
 

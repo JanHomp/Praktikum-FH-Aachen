@@ -24,24 +24,24 @@ import os
 import subprocess
 import sys
 
-# Pfad zum aktuell laufenden Python-Interpreter (damit Subskripte gleich laufen).
+# Pfad zum aktuell laufenden Python-Interpreter (damit Subskripte gleich laufen)
 PYTHON = sys.executable
-# Basisordner des Projekts (wo diese Datei liegt).
+# Basisordner des Projekts (wo diese Datei liegt)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Sammelordner fuer alle Versuchslaeufe.
+# Sammelordner fuer alle Versuchslaeufe
 RUNS_DIR = os.path.join(BASE_DIR, "runs")
 
 # Sicherheitsgrenzen: einzelne Schritte duerfen nicht zu lange laufen
-# und der Log-Ordner soll nicht unendlich wachsen.
+# und der Log-Ordner soll nicht unendlich wachsen
 TIMEOUT_SECONDS = 10
 LOG_LIMIT_GB = 10
 LOG_LIMIT_BYTES = LOG_LIMIT_GB * 1024 * 1024 * 1024
 RUN_ID_WIDTH = 2
 
 
-# Parameterraum fuer die Suche.
-# Hier definieren wir alle Werte, die ausprobiert werden.
-# Jede Kombination aus allen Listen wird getestet (vollstaendiges Grid).
+# Parameterraum fuer die Suche
+# Hier definieren wir alle Werte, die ausprobiert werden
+# Jede Kombination aus allen Listen wird getestet (vollstaendiges Grid)
 GRID = {
     "MAX_FEATURES": [600, 800, 1000],
     "LOOP_CLOSURE": [True],
@@ -62,11 +62,11 @@ def run_step(args, log_path, timeout_seconds):
     log_path: Datei, in die stdout/stderr geschrieben wird
     timeout_seconds: Abbruchzeit, falls ein Schritt haengt
     """
-    # Alles, was das Subprogramm ausgibt, landet im Log.
+    # Alles, was das Subprogramm ausgibt, landet im Log
     with open(log_path, "a") as log:
         log.write(f"\n# CMD: {' '.join(args)}\n")
         try:
-            # check=True -> wir bekommen bei Fehlern eine Exception.
+            # check=True -> wir bekommen bei Fehlern eine Exception
             subprocess.run(
                 args,
                 check=True,
@@ -89,7 +89,7 @@ def init_run_log(log_path, run_id, params):
 
     Der Header hilft, alte Logdateien eindeutig einem Run zuzuordnen.
     """
-    # Neues Log pro Run (alte Inhalte entfernen).
+    # Neues Log pro Run (alte Inhalte entfernen)
     with open(log_path, "w") as log:
         log.write(f"# RUN_ID: {run_id}\n")
         log.write("# PARAMS: " + ", ".join(f"{k}={format_value(v)}" for k, v in params.items()) + "\n")
@@ -157,7 +157,7 @@ def read_metrics(run_dir):
     Erwartete Felder in metrics.json:
     - ape_mean, rpe_mean (float)
     """
-    # Erwartet: metrics.json wird von evo_runner.py erzeugt.
+    # Erwartet: metrics.json wird von evo_runner.py erzeugt
     json_path = os.path.join(run_dir, "metrics.json")
     if os.path.isfile(json_path):
         try:
@@ -170,11 +170,11 @@ def read_metrics(run_dir):
             return ape, rpe
         except (OSError, ValueError, TypeError, json.JSONDecodeError):
             pass
-    # Wenn nichts gelesen werden konnte, geben wir None zurueck.
+    # Wenn nichts gelesen werden konnte, geben wir None zurueck
     return None, None
 
 
-# Reihenfolge der Parameter beibehalten (wichtig fuer CSV und Run-IDs).
+# Reihenfolge der Parameter beibehalten (wichtig fuer CSV und Run-IDs)
 param_names = list(GRID.keys())
 value_sets = [GRID[name] for name in param_names]
 
@@ -185,26 +185,26 @@ if not combos:
     print("FEHLER: Grid ist leer, keine Runs ausgefuehrt")
     sys.exit(2)
 
-# Ergebnisdateien vorbereiten.
+# Ergebnisdateien vorbereiten
 os.makedirs(RUNS_DIR, exist_ok=True)
 summary_path = os.path.join(RUNS_DIR, "grid_summary.csv")
 best_path = os.path.join(RUNS_DIR, "best_result.txt")
 best = None
 rows = []
 
-# Hauptschleife: jeder Parameter-Satz = ein Lauf.
+# Hauptschleife: jeder Parameter-Satz = ein Lauf
 for run_index, combo in enumerate(combos, 1):
     params = dict(zip(param_names, combo))
     run_id = build_run_id(run_index, params, param_names)
     run_dir = os.path.join(RUNS_DIR, run_id)
     config_path = os.path.join(run_dir, "config.ini")
-    # Evo nutzt TUM-Format (Schaetzung).
+    # Evo nutzt TUM-Format (Schaetzung)
     trajectory_path = os.path.join(run_dir, "trajectory_est.tum")
-    # Parameter fuer generate_config_ini.py vorbereiten.
+    # Parameter fuer generate_config_ini.py vorbereiten
     overrides = [f"{k}={format_value(params[k])}" for k in param_names]
     log_path = os.path.join(run_dir, "run.log")
 
-    # Stoppen, falls Speicherlimit erreicht.
+    # Stoppen, falls Speicherlimit erreicht
     if get_dir_size(RUNS_DIR) > LOG_LIMIT_BYTES:
         print(f"FEHLER: Speicherlimit erreicht ({LOG_LIMIT_GB}GB). Stoppe Runs.", flush=True)
         rows.append(
@@ -243,7 +243,7 @@ for run_index, combo in enumerate(combos, 1):
         rows.append({"run_id": run_id, "params": params, "status": status, "ape": None, "rpe": None})
         continue
 
-    # 4) Metriken lesen und in die Uebersicht schreiben.
+    # 4) Metriken lesen und in die Uebersicht schreiben
     ape, rpe = read_metrics(run_dir)
     if ape is None and rpe is None:
         write_status(run_dir, "FAILED_METRICS")
@@ -254,7 +254,7 @@ for run_index, combo in enumerate(combos, 1):
         rows.append({"run_id": run_id, "params": params, "status": "SUCCESS", "ape": ape, "rpe": rpe})
         print(f"Evo: APE={ape}, RPE={rpe}", flush=True)
 
-    # "Besten" Lauf merken: kleinste APE, dann RPE.
+    # "Besten" Lauf merken: kleinste APE, dann RPE
     if ape is not None:
         if best is None or ape < best["ape"] or (ape == best["ape"] and rpe is not None and rpe < best["rpe"]):
             best = {
@@ -265,8 +265,8 @@ for run_index, combo in enumerate(combos, 1):
             }
     print(f"=== {run_id} abgeschlossen ===", flush=True)
 
-# CSV-Zusammenfassung schreiben.
-# Spalten: run_id, Parameter, status, ape, rpe, best(1/leer).
+# CSV-Zusammenfassung schreiben
+# Spalten: run_id, Parameter, status, ape, rpe, best(1/leer)
 with open(summary_path, "w") as summary:
     summary.write("run_id," + ",".join(param_names) + ",status,ape,rpe,best\n")
     for row in rows:

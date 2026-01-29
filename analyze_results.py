@@ -30,7 +30,7 @@ def to_float(value):
 
 
 def describe(values):
-    # Kurze Statistik (nur wenn Werte vorhanden sind).
+    # Kurze Statistik (nur wenn Werte vorhanden sind)
     if not values:
         return None
     return {
@@ -64,7 +64,7 @@ def main():
     # Filter nur erfolgreiche Runs
     ok_rows = [r for r in rows if r.get("status") == "SUCCESS"]
 
-    # Werte fuer Statistik sammeln (nur vorhandene Zahlen).
+    # Werte fuer Statistik sammeln (nur vorhandene Zahlen)
     ape_vals = [r["ape"] for r in ok_rows if r["ape"] is not None]
     rpe_vals = [r["rpe"] for r in ok_rows if r["rpe"] is not None]
 
@@ -76,7 +76,7 @@ def main():
     if rpe_vals:
         best_by_rpe = min(ok_rows, key=lambda r: r["rpe"] if r["rpe"] is not None else float("inf"))
 
-    # Text-Report vorbereiten (als Liste von Zeilen).
+    # Text-Report vorbereiten (als Liste von Zeilen)
     lines = []
     lines.append(f"Datei: {summary_path}")
     lines.append(f"Runs total: {len(rows)} | SUCCESS: {len(ok_rows)}")
