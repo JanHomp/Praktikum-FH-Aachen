@@ -49,4 +49,4 @@ with open(metrics_path, "w") as f:
     f.write(f"APE: {ape}\n")
     f.write(f"RPE: {rpe}\n")
 
-print(f"Dummy-evo OK → APE={ape}, RPE={rpe}")
+print(f"Evo OK → APE={ape}, RPE={rpe}")

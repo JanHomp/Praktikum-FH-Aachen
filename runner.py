@@ -183,7 +183,7 @@ for i, combo in enumerate(combos, 1):
         rows.append({"run_id": run_id, "params": params, "status": status, "ape": None, "rpe": None})
         continue
 
-    status = run_step([PYTHON, "dummy_evo.py", trajectory_path], log_path, TIMEOUT_SECONDS)
+    status = run_step([PYTHON, "evo.py", trajectory_path], log_path, TIMEOUT_SECONDS)
     if status != "OK":
         write_status(run_dir, status)
         rows.append({"run_id": run_id, "params": params, "status": status, "ape": None, "rpe": None})
