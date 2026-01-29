@@ -41,6 +41,7 @@ RUN_ID_WIDTH = 2
 
 # Parameterraum fuer die Suche.
 # Hier definieren wir alle Werte, die ausprobiert werden.
+# Jede Kombination aus allen Listen wird getestet (vollstaendiges Grid).
 GRID = {
     "MAX_FEATURES": [600, 800, 1000],
     "LOOP_CLOSURE": [True],
@@ -61,9 +62,11 @@ def run_step(args, log_path, timeout_seconds):
     log_path: Datei, in die stdout/stderr geschrieben wird
     timeout_seconds: Abbruchzeit, falls ein Schritt haengt
     """
+    # Alles, was das Subprogramm ausgibt, landet im Log.
     with open(log_path, "a") as log:
         log.write(f"\n# CMD: {' '.join(args)}\n")
         try:
+            # check=True -> wir bekommen bei Fehlern eine Exception.
             subprocess.run(
                 args,
                 check=True,
@@ -86,6 +89,7 @@ def init_run_log(log_path, run_id, params):
 
     Der Header hilft, alte Logdateien eindeutig einem Run zuzuordnen.
     """
+    # Neues Log pro Run (alte Inhalte entfernen).
     with open(log_path, "w") as log:
         log.write(f"# RUN_ID: {run_id}\n")
         log.write("# PARAMS: " + ", ".join(f"{k}={format_value(v)}" for k, v in params.items()) + "\n")
@@ -153,6 +157,7 @@ def read_metrics(run_dir):
     Erwartete Felder in metrics.json:
     - ape_mean, rpe_mean (float)
     """
+    # Erwartet: metrics.json wird von evo_runner.py erzeugt.
     json_path = os.path.join(run_dir, "metrics.json")
     if os.path.isfile(json_path):
         try:
@@ -165,6 +170,7 @@ def read_metrics(run_dir):
             return ape, rpe
         except (OSError, ValueError, TypeError, json.JSONDecodeError):
             pass
+    # Wenn nichts gelesen werden konnte, geben wir None zurueck.
     return None, None
 
 
@@ -194,6 +200,7 @@ for run_index, combo in enumerate(combos, 1):
     config_path = os.path.join(run_dir, "config.ini")
     # Evo nutzt TUM-Format (Schaetzung).
     trajectory_path = os.path.join(run_dir, "trajectory_est.tum")
+    # Parameter fuer generate_config_ini.py vorbereiten.
     overrides = [f"{k}={format_value(params[k])}" for k in param_names]
     log_path = os.path.join(run_dir, "run.log")
 

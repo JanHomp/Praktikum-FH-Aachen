@@ -27,8 +27,11 @@ import zipfile
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Evo-Wrapper (TUM)")
+    # Schaetzung (trajectory_est.tum) ist Pflicht.
     parser.add_argument("trajectory", help="Pfad zur Trajektorie (Schaetzung)")
+    # Ground-Truth ist optional, kann aber erzwungen sein, wenn nichts gefunden wird.
     parser.add_argument("--ground-truth", dest="ground_truth", default=None)
+    # Optional: eigener Zielpfad fuer metrics.json.
     parser.add_argument("--metrics-path", default=None)
     return parser.parse_args()
 
@@ -42,6 +45,7 @@ def find_evo_cmd(name):
         os.path.join(base_dir, ".venv", "bin"),
         os.path.join(os.path.expanduser("~"), ".venv", "bin"),
     ]
+    # None entfernen, damit der Search-Path sauber bleibt.
     candidates = [c for c in candidates if c]
     search_path = os.pathsep.join(candidates + [os.environ.get("PATH", "")])
     return shutil.which(name, path=search_path)
@@ -54,6 +58,7 @@ def find_ground_truth(run_dir):
         os.path.join(run_dir, "groundtruth.tum"),
         os.path.join(run_dir, "gt.tum"),
     ]
+    # Erster Treffer gewinnt.
     for path in candidates:
         if os.path.isfile(path):
             return path
@@ -67,6 +72,7 @@ def read_stats_from_zip(zip_path):
     with zipfile.ZipFile(zip_path, "r") as zf:
         if "stats.json" not in zf.namelist():
             raise FileNotFoundError("stats.json fehlt im Ergebnis-ZIP")
+        # JSON direkt aus dem ZIP lesen.
         return json.loads(zf.read("stats.json"))
 
 
@@ -87,30 +93,36 @@ def write_metrics_json(path, ape, rpe, runtime_sec, ape_rmse, rpe_rmse):
 
 def run_evo(trajectory_path, ground_truth, metrics_path):
     run_dir = os.path.dirname(trajectory_path)
+    # Ground-Truth ermitteln (Parameter oder Standard-Dateiname).
     gt_path = ground_truth or find_ground_truth(run_dir)
     if not gt_path:
         raise FileNotFoundError("Ground-Truth fehlt (erwartet trajectory_gt.tum)")
 
+    # Pfade zu evo_ape/evo_rpe finden.
     evo_ape = find_evo_cmd("evo_ape")
     evo_rpe = find_evo_cmd("evo_rpe")
     if not evo_ape or not evo_rpe:
         raise FileNotFoundError("evo_ape/evo_rpe nicht gefunden (PATH oder ~/.venv)")
 
+    # Ergebnis-ZIPs, die evo erzeugt.
     ape_zip = os.path.join(run_dir, "evo_ape_results.zip")
     rpe_zip = os.path.join(run_dir, "evo_rpe_results.zip")
 
     print(f"Evo-CLI: {evo_ape} / {evo_rpe}")
     start = time.time()
+    # APE berechnen
     subprocess.run(
         [evo_ape, "tum", gt_path, trajectory_path, "--save_results", ape_zip, "--silent"],
         check=True,
     )
+    # RPE berechnen
     subprocess.run(
         [evo_rpe, "tum", gt_path, trajectory_path, "--save_results", rpe_zip, "--silent"],
         check=True,
     )
     runtime_sec = time.time() - start
 
+    # Statistik aus den ZIPs holen.
     ape_stats = read_stats_from_zip(ape_zip)
     rpe_stats = read_stats_from_zip(rpe_zip)
 
@@ -133,6 +145,7 @@ def main():
         return 2
 
     run_dir = os.path.dirname(trajectory_path)
+    # Default: metrics.json im Run-Ordner.
     metrics_path = args.metrics_path or os.path.join(run_dir, "metrics.json")
 
     try:

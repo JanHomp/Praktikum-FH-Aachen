@@ -29,6 +29,7 @@ RUN_ID = sys.argv[1] if len(sys.argv) > 1 else "run_001"
 OUTPUT_DIR = os.path.join(BASE_DIR, "runs", RUN_ID)
 OUTPUT_CONFIG = os.path.join(OUTPUT_DIR, "config.ini")
 
+# Run-Ordner anlegen, falls er noch nicht existiert.
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def coerce_value(raw):
@@ -69,6 +70,7 @@ with open(TEMPLATE_PATH, "r") as f:
     template_text = f.read()
 
 # Platzhalter {{KEY}} durch die aktuellen Werte ersetzen.
+# Platzhalter im Template ersetzen.
 for key, value in params.items():
     template_text = template_text.replace(f"{{{{{key}}}}}", str(value))
 
